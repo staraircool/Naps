@@ -14,8 +14,8 @@ workflows:
     scripts:
       - name: Set up Flutter
         script: |
-          flutter clean
           flutter pub get
+          flutter clean
       - name: Build Android Release
         script: |
           flutter build apk --release
