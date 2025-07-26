@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
 import '../services/mining_service.dart';
+import 'dart:async';
+import 'dart:math' as math;
 
 class SleepScreen extends StatefulWidget {
   const SleepScreen({super.key});
@@ -12,94 +13,110 @@ class SleepScreen extends StatefulWidget {
 class _SleepScreenState extends State<SleepScreen>
     with TickerProviderStateMixin {
   final MiningService _miningService = MiningService.instance;
-  late AnimationController _pandaAnimationController;
-  late AnimationController _zzAnimationController;
-  late Animation<double> _pandaFloatAnimation;
-  late Animation<double> _zzOpacityAnimation;
-  Timer? _timerUpdateTimer;
-  String _remainingTime = '12:00:00';
+  Timer? _timer;
+  Duration _remainingTime = const Duration(hours: 12);
+  late AnimationController _pandaController;
+  late AnimationController _zzzController;
+  late AnimationController _parallaxController;
+  late AnimationController _breathingController;
+  late Animation<double> _pandaAnimation;
+  late Animation<double> _zzzAnimation;
+  late Animation<Offset> _parallaxAnimation;
+  late Animation<double> _breathingAnimation;
 
   @override
   void initState() {
     super.initState();
+    _startTimer();
     _initializeAnimations();
-    _startMining();
-    _startTimerUpdates();
   }
 
   void _initializeAnimations() {
-    // Panda floating animation
-    _pandaAnimationController = AnimationController(
-      duration: const Duration(seconds: 4),
+    _pandaController = AnimationController(
+      duration: const Duration(seconds: 3),
       vsync: this,
     )..repeat(reverse: true);
 
-    _pandaFloatAnimation = Tween<double>(
-      begin: -10.0,
-      end: 10.0,
-    ).animate(CurvedAnimation(
-      parent: _pandaAnimationController,
-      curve: Curves.easeInOut,
-    ));
-
-    // ZZZ animation
-    _zzAnimationController = AnimationController(
+    _zzzController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat();
 
-    _zzOpacityAnimation = Tween<double>(
-      begin: 0.3,
+    _parallaxController = AnimationController(
+      duration: const Duration(seconds: 30),
+      vsync: this,
+    )..repeat();
+
+    _breathingController = AnimationController(
+      duration: const Duration(seconds: 4),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _pandaAnimation = Tween<double>(
+      begin: -5.0,
+      end: 5.0,
+    ).animate(CurvedAnimation(
+      parent: _pandaController,
+      curve: Curves.easeInOut,
+    ));
+
+    _zzzAnimation = Tween<double>(
+      begin: 0.0,
       end: 1.0,
     ).animate(CurvedAnimation(
-      parent: _zzAnimationController,
+      parent: _zzzController,
+      curve: Curves.easeInOut,
+    ));
+
+    _parallaxAnimation = Tween<Offset>(
+      begin: const Offset(-0.1, 0),
+      end: const Offset(0.1, 0),
+    ).animate(CurvedAnimation(
+      parent: _parallaxController,
+      curve: Curves.linear,
+    ));
+
+    _breathingAnimation = Tween<double>(
+      begin: 0.95,
+      end: 1.05,
+    ).animate(CurvedAnimation(
+      parent: _breathingController,
       curve: Curves.easeInOut,
     ));
   }
 
-  Future<void> _startMining() async {
-    if (!_miningService.isMining) {
-      await _miningService.startMining();
-    }
-  }
-
-  void _startTimerUpdates() {
-    _updateTimer();
-    _timerUpdateTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      _updateTimer();
-    });
-  }
-
-  void _updateTimer() {
-    final remaining = _miningService.getRemainingTime();
-    if (remaining != null) {
-      final hours = remaining.inHours;
-      final minutes = remaining.inMinutes % 60;
-      final seconds = remaining.inSeconds % 60;
-      
-      setState(() {
-        _remainingTime = '${hours.toString().padLeft(2, '0')}:'
-            '${minutes.toString().padLeft(2, '0')}:'
-            '${seconds.toString().padLeft(2, '0')}';
-      });
-
-      // If time is up, navigate back
-      if (remaining.inSeconds <= 0) {
-        _wakeUp();
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_remainingTime.inSeconds > 0) {
+        setState(() {
+          _remainingTime = _remainingTime - const Duration(seconds: 1);
+        });
+      } else {
+        timer.cancel();
       }
-    }
-  }
-
-  void _wakeUp() {
-    Navigator.of(context).pop();
+    });
   }
 
   @override
   void dispose() {
-    _pandaAnimationController.dispose();
-    _zzAnimationController.dispose();
-    _timerUpdateTimer?.cancel();
+    _timer?.cancel();
+    _pandaController.dispose();
+    _zzzController.dispose();
+    _parallaxController.dispose();
+    _breathingController.dispose();
     super.dispose();
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    String hours = twoDigits(duration.inHours);
+    String minutes = twoDigits(duration.inMinutes.remainder(60));
+    String seconds = twoDigits(duration.inSeconds.remainder(60));
+    return '$hours:$minutes:$seconds';
+  }
+
+  Future<void> _wakeUp() async {
+    Navigator.of(context).pop();
   }
 
   @override
@@ -108,7 +125,6 @@ class _SleepScreenState extends State<SleepScreen>
       body: GestureDetector(
         onVerticalDragEnd: (details) {
           if (details.primaryVelocity! < -500) {
-            // Swipe up to wake
             _wakeUp();
           }
         },
@@ -118,318 +134,243 @@ class _SleepScreenState extends State<SleepScreen>
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
-                Color(0xFF1A1A2E), // Dark blue
-                Color(0xFF0F0F23), // Very dark blue/black
+                Color(0xFF0F0F23),
+                Color(0xFF1A1A2E),
+                Color(0xFF16213E),
               ],
             ),
           ),
-          child: SafeArea(
-            child: Column(
-              children: [
-                // Timer section
-                Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
+          child: Stack(
+            children: [
+              // Parallax background elements
+              AnimatedBuilder(
+                animation: _parallaxAnimation,
+                builder: (context, child) {
+                  return Positioned.fill(
+                    child: Transform.translate(
+                      offset: Offset(
+                        _parallaxAnimation.value.dx * 50,
+                        _parallaxAnimation.value.dy * 50,
+                      ),
+                      child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.8),
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                        child: Text(
-                          'Start next session after\n$_remainingTime',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                          gradient: RadialGradient(
+                            center: const Alignment(0.3, -0.5),
+                            radius: 1.5,
+                            colors: [
+                              Colors.blue.withOpacity(0.1),
+                              Colors.transparent,
+                            ],
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      Text(
-                        '"You\'re in Dream Mode. You\'ll wake up with more \$NAP."',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.white.withOpacity(0.8),
-                          fontStyle: FontStyle.italic,
+                    ),
+                  );
+                },
+              ),
+              // Floating particles
+              ...List.generate(20, (index) {
+                return AnimatedBuilder(
+                  animation: _parallaxController,
+                  builder: (context, child) {
+                    final offset = math.sin(_parallaxController.value * 2 * math.pi + index) * 20;
+                    return Positioned(
+                      left: (index * 50.0) % MediaQuery.of(context).size.width,
+                      top: 100 + offset + (index * 30.0) % 400,
+                      child: Container(
+                        width: 3,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.3),
+                          shape: BoxShape.circle,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                // Sleeping panda section
-                Expanded(
-                  child: Center(
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // Animated panda
-                        AnimatedBuilder(
-                          animation: _pandaFloatAnimation,
-                          builder: (context, child) {
-                            return Transform.translate(
-                              offset: Offset(0, _pandaFloatAnimation.value),
-                              child: _buildSleepingPanda(),
-                            );
-                          },
+                    );
+                  },
+                );
+              }),
+              SafeArea(
+                child: Column(
+                  children: [
+                    // Timer section
+                    Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: AnimatedBuilder(
+                        animation: _breathingAnimation,
+                        builder: (context, child) {
+                          return Transform.scale(
+                            scale: _breathingAnimation.value,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(25),
+                                border: Border.all(
+                                  color: Colors.blue.withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                'Start next session after\n${_formatDuration(_remainingTime)}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    // Dream mode message
+                    const Text(
+                      '"You\'re in Dream Mode. You\'ll wake up with more \$NAP."',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Animated sleeping panda
+                            AnimatedBuilder(
+                              animation: _pandaAnimation,
+                              builder: (context, child) {
+                                return Transform.translate(
+                                  offset: Offset(0, _pandaAnimation.value),
+                                  child: AnimatedBuilder(
+                                    animation: _breathingAnimation,
+                                    builder: (context, child) {
+                                      return Transform.scale(
+                                        scale: _breathingAnimation.value,
+                                        child: Container(
+                                          width: 200,
+                                          height: 200,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.blue.withOpacity(0.3),
+                                                blurRadius: 20,
+                                                spreadRadius: 5,
+                                              ),
+                                            ],
+                                          ),
+                                          child: ClipOval(
+                                            child: Image.asset(
+                                              'assets/images/sleeping_panda.jpeg',
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) {
+                                                return Container(
+                                                  color: Colors.white,
+                                                  child: const Icon(
+                                                    Icons.pets,
+                                                    size: 100,
+                                                    color: Colors.black,
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 40),
+                            // Animated ZZZ
+                            AnimatedBuilder(
+                              animation: _zzzAnimation,
+                              builder: (context, child) {
+                                return Opacity(
+                                  opacity: _zzzAnimation.value,
+                                  child: Transform.translate(
+                                    offset: Offset(
+                                      20 + (_zzzAnimation.value * 30),
+                                      -20 - (_zzzAnimation.value * 20),
+                                    ),
+                                    child: Transform.scale(
+                                      scale: 0.8 + (_zzzAnimation.value * 0.4),
+                                      child: const Text(
+                                        'Z Z Z',
+                                        style: TextStyle(
+                                          fontSize: 32,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white70,
+                                          letterSpacing: 8,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
-                        // ZZZ animation
-                        Positioned(
-                          top: 50,
-                          right: 80,
-                          child: AnimatedBuilder(
-                            animation: _zzOpacityAnimation,
+                      ),
+                    ),
+                    // Swipe up to awake
+                    Padding(
+                      padding: const EdgeInsets.all(32.0),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Swipe Up to Awake',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.white70,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          AnimatedBuilder(
+                            animation: _breathingAnimation,
                             builder: (context, child) {
-                              return Opacity(
-                                opacity: _zzOpacityAnimation.value,
-                                child: Column(
-                                  children: [
-                                    _buildZZZ(size: 24, delay: 0),
-                                    const SizedBox(height: 8),
-                                    _buildZZZ(size: 20, delay: 200),
-                                    const SizedBox(height: 8),
-                                    _buildZZZ(size: 16, delay: 400),
-                                  ],
+                              return Transform.scale(
+                                scale: _breathingAnimation.value,
+                                child: Container(
+                                  width: 60,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.3),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.keyboard_arrow_up,
+                                    color: Colors.white,
+                                    size: 32,
+                                  ),
                                 ),
                               );
                             },
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-                // Bottom section with swipe up
-                Padding(
-                  padding: const EdgeInsets.all(32.0),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Swipe Up to Awake',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.keyboard_arrow_up,
-                          color: Colors.white,
-                          size: 32,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildSleepingPanda() {
-    return SizedBox(
-      width: 200,
-      height: 150,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Branch/log
-          Positioned(
-            bottom: 20,
-            child: Container(
-              width: 160,
-              height: 20,
-              decoration: BoxDecoration(
-                color: const Color(0xFF8B4513), // Brown
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-          // Panda body
-          Positioned(
-            bottom: 30,
-            child: Container(
-              width: 120,
-              height: 80,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.all(Radius.circular(40)),
-              ),
-            ),
-          ),
-          // Panda head
-          Positioned(
-            bottom: 70,
-            left: 40,
-            child: Container(
-              width: 80,
-              height: 80,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Ears
-                  Positioned(
-                    top: 5,
-                    left: 10,
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: const BoxDecoration(
-                        color: Colors.black,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 5,
-                    right: 10,
-                    child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: const BoxDecoration(
-                        color: Colors.black,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                  // Eye patches (closed eyes)
-                  Positioned(
-                    top: 25,
-                    left: 15,
-                    child: Container(
-                      width: 15,
-                      height: 20,
-                      decoration: const BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.all(Radius.circular(10)),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 25,
-                    right: 15,
-                    child: Container(
-                      width: 15,
-                      height: 20,
-                      decoration: const BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.all(Radius.circular(10)),
-                      ),
-                    ),
-                  ),
-                  // Sleeping eyes (lines)
-                  Positioned(
-                    top: 32,
-                    left: 18,
-                    child: Container(
-                      width: 10,
-                      height: 2,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.all(Radius.circular(1)),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    top: 32,
-                    right: 18,
-                    child: Container(
-                      width: 10,
-                      height: 2,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.all(Radius.circular(1)),
-                      ),
-                    ),
-                  ),
-                  // Nose
-                  Positioned(
-                    top: 45,
-                    child: Container(
-                      width: 6,
-                      height: 4,
-                      decoration: const BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.all(Radius.circular(2)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Panda arms/paws
-          Positioned(
-            bottom: 40,
-            left: 20,
-            child: Container(
-              width: 30,
-              height: 30,
-              decoration: const BoxDecoration(
-                color: Colors.black,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 40,
-            right: 20,
-            child: Container(
-              width: 30,
-              height: 30,
-              decoration: const BoxDecoration(
-                color: Colors.black,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildZZZ({required double size, required int delay}) {
-    return TweenAnimationBuilder<double>(
-      duration: Duration(milliseconds: 1500 + delay),
-      tween: Tween(begin: 0.0, end: 1.0),
-      builder: (context, value, child) {
-        return Transform.translate(
-          offset: Offset(0, -value * 20),
-          child: Opacity(
-            opacity: 1.0 - value,
-            child: Text(
-              'Z',
-              style: TextStyle(
-                fontSize: size,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }
