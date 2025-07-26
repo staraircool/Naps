@@ -328,7 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
               
               if (mounted) {
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+                  MaterialPageRoute(builder: (context) => const AppNavigator()),
                   (route) => false,
                 );
               }
