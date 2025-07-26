@@ -94,8 +94,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final balance = _miningService.getCurrentBalance();
-    final miningRate = _miningService.getMiningRate();
+    final balance = _miningService.currentBalance;
+    final miningRate = _miningService.miningRate;
 
     return Scaffold(
       appBar: AppBar(
