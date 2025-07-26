@@ -1,3 +1,4 @@
+import 'package:napcoin_app/main.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/mining_service.dart';
