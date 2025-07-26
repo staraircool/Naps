@@ -4,7 +4,6 @@ import '../services/mining_service.dart';
 import 'sleep_screen.dart';
 import 'invite_screen.dart';
 import 'faq_screen.dart';
-import 'welcome_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -329,7 +328,7 @@ class _HomeScreenState extends State<HomeScreen> {
               
               if (mounted) {
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+                  MaterialPageRoute(builder: (context) => const OnboardingScreen()),
                   (route) => false,
                 );
               }
