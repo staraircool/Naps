@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/onboarding_screen.dart';
-import 'screens/welcome_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/mining_service.dart';
 
@@ -76,10 +75,7 @@ class _AppNavigatorState extends State<AppNavigator> {
       return const OnboardingScreen();
     }
 
-    if (!_isLoggedIn) {
-      return const WelcomeScreen();
-    }
-
+    // If not first time, directly go to home screen (bypassing login/signup for now)
     return const HomeScreen();
   }
 }
